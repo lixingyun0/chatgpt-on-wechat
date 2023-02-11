@@ -1,4 +1,5 @@
 # encoding:utf-8
+import uuid
 
 from bot.bot import Bot
 from config import conf
@@ -26,7 +27,7 @@ class OpenAIBot(Bot):
             new_query = Session.build_session_query(query, from_user_id)
             logger.debug("[OPEN_AI] session query={}".format(new_query))
 
-            reply_content = self.reply_text(new_query, from_user_id, 0)
+            reply_content = self._reply_text(new_query, from_user_id, 0)
             logger.debug("[OPEN_AI] new_query={}, user={}, reply_cont={}".format(new_query, from_user_id, reply_content))
             if reply_content and query:
                 Session.save_session(query, reply_content, from_user_id)
@@ -35,7 +36,7 @@ class OpenAIBot(Bot):
         elif context.get('type', None) == 'IMAGE_CREATE':
             return self.create_img(query, 0)
 
-    def reply_text(self, query, user_id, retry_count=0):
+    def _reply_text(self, query, user_id, retry_count=0):
         try:
             response = openai.Completion.create(
                 model="text-davinci-003",  # 对话模型的名称
@@ -47,7 +48,9 @@ class OpenAIBot(Bot):
                 presence_penalty=0.0,  # [-2,2]之间，该值越大则更倾向于产生不同的内容
                 stop=["#"]
             )
-            res_content = response.choices[0]["text"].strip().rstrip("<|im_end|>")
+            qaid = uuid.uuid4()
+            logger.info('{}发送内容:\n{}'.format(qaid,query))
+            res_content = response.choices[0]["text"].rstrip("<|im_end|>")
             logger.info("[OPEN_AI] reply={}".format(res_content))
             return res_content
         except openai.error.RateLimitError as e:
@@ -56,7 +59,7 @@ class OpenAIBot(Bot):
             if retry_count < 1:
                 time.sleep(5)
                 logger.warn("[OPEN_AI] RateLimit exceed, 第{}次重试".format(retry_count+1))
-                return self.reply_text(query, user_id, retry_count+1)
+                return self._reply_text(query, user_id, retry_count+1)
             else:
                 return "提问太快啦，请休息一下再问我吧"
         except Exception as e:
@@ -82,7 +85,7 @@ class OpenAIBot(Bot):
             if retry_count < 1:
                 time.sleep(5)
                 logger.warn("[OPEN_AI] ImgCreate RateLimit exceed, 第{}次重试".format(retry_count+1))
-                return self.reply_text(query, retry_count+1)
+                return self._reply_text(query, retry_count+1)
             else:
                 return "提问太快啦，请休息一下再问我吧"
         except Exception as e:

@@ -31,3 +31,4 @@ def read_file(path):
 
 def conf():
     return config
+
